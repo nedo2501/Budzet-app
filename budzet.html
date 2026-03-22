@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budžet — Nedim Ćehić</title>
+<meta name="theme-color" content="#0f0f0f">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+:root{
+  --bg:#0f0f0f;--surface:#181818;--surface2:#222;--surface3:#2a2a2a;
+  --accent:#c8f535;--accent2:#ff6b35;--accent3:#35c8f5;--accent4:#a855f7;
+  --nedim:#c8f535;--azra:#ff6b9d;
+  --text:#f0f0f0;--muted:#666;--border:#2a2a2a;
+  --green:#4ade80;--red:#f87171;--yellow:#fbbf24;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+
+/* HEADER */
+.header{padding:20px 20px 6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.header h1{font-family:'Syne',sans-serif;font-size:1.55rem;font-weight:800;letter-spacing:-1px;line-height:1.1}
+.header h1 .ac{color:var(--accent)}
+.header h1 .fam{display:block;font-size:.6rem;font-weight:400;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px;font-family:'DM Sans',sans-serif}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.hav{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;background:var(--nedim);color:#000;border:2px solid var(--bg);flex-shrink:0}
+
+/* SYNC */
+.sync-pill{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:.6rem;color:var(--muted)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.sync-dot.connected{background:var(--green)}
+.sync-dot.syncing{background:var(--yellow);animation:pulse .8s infinite}
+.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* TABS */
+.tabs{display:flex;gap:3px;padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:20;overflow-x:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:44px;padding:6px 2px;border:1px solid var(--border);border-radius:9px;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.56rem;font-weight:500;cursor:pointer;transition:all .2s;text-align:center;white-space:nowrap}
+.tab.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.tab-icon{display:block;font-size:.84rem;margin-bottom:1px}
+.page{display:none;padding:14px 18px 90px;flex:1}
+.page.active{display:block}
+
+/* MONTH SELECTOR */
+.month-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 14px}
+.month-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:6px;transition:all .15s}
+.month-nav:hover{color:var(--accent);background:var(--surface2)}
+.month-label{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;color:var(--text);text-align:center;flex:1}
+
+/* OVERVIEW CARDS */
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.ov-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 14px}
+.ov-card.full{grid-column:1/-1}
+.ov-label{font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:3px}
+.ov-amt{font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:800;letter-spacing:-.5px;line-height:1}
+.ov-amt.income{color:var(--green)}
+.ov-amt.expense{color:var(--red)}
+.ov-amt.balance.pos{color:var(--accent)}
+.ov-amt.balance.neg{color:var(--red)}
+.ov-sub{font-size:.6rem;color:var(--muted);margin-top:3px}
+
+/* SAVINGS CARD */
+.savings-card{background:linear-gradient(135deg,#1a2a04,#111a00);border:1px solid var(--accent);border-radius:14px;padding:13px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sc-left{flex:1}
+.sc-label{font-size:.56rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:1px}
+.sc-amt{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:var(--accent);letter-spacing:-.5px;line-height:1}
+.sc-sub{font-size:.6rem;color:var(--muted);margin-top:2px}
+.sc-right{text-align:right}
+.sc-rate{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;color:var(--accent)}
+.sc-rate-label{font-size:.58rem;color:var(--muted)}
+
+/* BUDGET BAR */
+.budget-bar-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+.bb-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.bb-label{font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.bb-pct{font-family:'Syne',sans-serif;font-size:.82rem;font-weight:700}
+.bar-track{height:8px;background:var(--surface2);border-radius:10px;overflow:hidden}
+.bar-fill{height:100%;border-radius:10px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.bar-fill.safe{background:var(--green)}
+.bar-fill.warn{background:var(--yellow)}
+.bar-fill.over{background:var(--red)}
+
+/* CAT BREAKDOWN */
+.cat-breakdown{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+.cb-title{font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:10px}
+.cb-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.cb-icon{font-size:1rem;width:24px;text-align:center;flex-shrink:0}
+.cb-info{flex:1;min-width:0}
+.cb-name{font-size:.76rem;font-weight:500;margin-bottom:2px}
+.cb-bar-track{height:4px;background:var(--surface2);border-radius:10px;overflow:hidden}
+.cb-bar-fill{height:100%;border-radius:10px;transition:width .4s}
+.cb-amt{font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;color:var(--muted);flex-shrink:0;text-align:right;min-width:52px}
+
+/* KUPOVINA SOURCE CARD */
+.kupovina-source{background:rgba(53,200,245,.06);border:1px solid rgba(53,200,245,.25);border-radius:14px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ks-left{flex:1}
+.ks-label{font-size:.56rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent3);margin-bottom:2px}
+.ks-desc{font-size:.74rem;font-weight:500}
+.ks-sub{font-size:.6rem;color:var(--muted);margin-top:1px}
+.ks-amt{font-family:'Syne',sans-serif;font-weight:800;font-size:.92rem;color:var(--accent3);flex-shrink:0}
+
+/* TIP */
+.tip-card{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:10px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+.tip-icon{font-size:.95rem;flex-shrink:0;margin-top:1px}
+.tip-text{font-size:.73rem;color:var(--text);line-height:1.5}
+.tip-text strong{color:var(--accent4)}
+
+/* FORMS */
+.form-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.section-title{font-family:'Syne',sans-serif;font-size:.86rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.dot.red{background:var(--red)}
+.dot.yellow{background:var(--yellow)}
+.dot.blue{background:var(--accent3)}
+.field{margin-bottom:9px}
+.field label{display:block;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.field input,.field select{width:100%;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--muted)}
+.field select option{background:var(--surface2)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+
+/* BUTTONS */
+.btn{width:100%;padding:10px;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:.86rem;font-weight:700;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-sm{padding:5px 12px;font-size:.7rem;width:auto;border-radius:7px}
+
+/* ITEM CARDS */
+.item-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border-radius:11px;margin-bottom:6px;border:1px solid var(--border)}
+.ic-icon{font-size:1rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface2);flex-shrink:0}
+.ic-info{flex:1;min-width:0}
+.ic-name{font-weight:500;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic-sub{font-size:.6rem;color:var(--muted);margin-top:1px}
+.ic-badge{display:inline-block;font-size:.52rem;padding:1px 5px;border-radius:5px;font-weight:700;margin-left:4px}
+.badge-fixed{background:rgba(168,85,247,.2);color:var(--accent4)}
+.badge-var{background:rgba(200,245,53,.12);color:var(--accent)}
+.badge-kup{background:rgba(53,200,245,.15);color:var(--accent3)}
+.ic-right{text-align:right;flex-shrink:0}
+.ic-amt{font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:var(--red)}
+.ic-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.78rem;padding:2px;border-radius:4px;display:block;margin-top:2px;margin-left:auto;transition:all .15s}
+.ic-del:hover{color:var(--accent2)}
+
+/* INCOME ITEMS */
+.inc-card{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:9px;margin-bottom:5px;border:1px solid var(--border)}
+.inc-icon{font-size:.9rem;flex-shrink:0}
+.inc-info{flex:1}
+.inc-name{font-size:.82rem;font-weight:500}
+.inc-date{font-size:.6rem;color:var(--muted);margin-top:1px}
+.inc-amt{font-family:'Syne',sans-serif;font-size:.86rem;font-weight:700;color:var(--green);flex-shrink:0}
+.inc-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.76rem;padding:2px;transition:all .15s;flex-shrink:0}
+.inc-del:hover{color:var(--accent2)}
+
+/* QUICK TOTAL */
+.quick-total{background:var(--surface2);border-radius:10px;padding:10px 13px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;border:1px solid var(--border)}
+.qt-label{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.qt-amt{font-family:'Syne',sans-serif;font-size:.96rem;font-weight:800;color:var(--text)}
+
+/* FIXED HINT */
+.fixed-hint{font-size:.67rem;color:var(--muted);margin-bottom:10px;line-height:1.4;padding:7px 10px;background:var(--surface2);border-radius:8px;border-left:2px solid var(--accent4)}
+.kupovina-hint{font-size:.67rem;color:var(--muted);margin-bottom:10px;line-height:1.4;padding:7px 10px;background:rgba(53,200,245,.06);border-radius:8px;border-left:2px solid var(--accent3)}
+
+/* HISTORY */
+.hist-month{margin-bottom:14px}
+.hist-month-hdr{font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.hist-month-result{font-size:.68rem;padding:2px 7px;border-radius:8px;font-weight:700}
+.hist-month-result.pos{background:rgba(74,222,128,.15);color:var(--green)}
+.hist-month-result.neg{background:rgba(248,113,113,.15);color:var(--red)}
+.hist-row{display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--surface);border-radius:9px;border:1px solid var(--border);margin-bottom:5px}
+.hist-type{font-size:.64rem;font-weight:700;min-width:58px;flex-shrink:0}
+.hist-type.i{color:var(--green)}
+.hist-type.e{color:var(--red)}
+.hist-type.k{color:var(--accent3)}
+.hist-desc{flex:1;font-size:.76rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.hist-amt{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;flex-shrink:0}
+.hist-amt.i{color:var(--green)}
+.hist-amt.e{color:var(--red)}
+.hist-amt.k{color:var(--accent3)}
+
+/* ANALYTICS */
+.analytics-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+.analytics-title{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:12px}
+.trend-chart{display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:6px}
+.trend-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}
+.trend-bar{width:100%;border-radius:4px 4px 0 0;min-height:3px;transition:height .4s}
+.trend-bar.income-bar{background:var(--green);opacity:.7}
+.trend-bar.expense-bar{background:var(--red);opacity:.7}
+.trend-label{font-size:.5rem;color:var(--muted);text-align:center}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:10px 0}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:28px 20px;color:var(--muted)}
+.empty-state .icon{font-size:2rem;margin-bottom:6px}
+.empty-state p{font-size:.76rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 18px;border-radius:12px;font-size:.78rem;font-weight:500;opacity:0;transition:all .3s;pointer-events:none;z-index:100;white-space:nowrap;max-width:88vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <span class="ac">Budžet</span>
+    <span class="fam">Nedim Ćehić</span>
+  </h1>
+  <div class="header-right">
+    <div class="sync-pill">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">—</span>
+    </div>
+    <div class="hav">N</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="showPage('pregled')"><span class="tab-icon">📊</span>Pregled</button>
+  <button class="tab" onclick="showPage('prihodi')"><span class="tab-icon">💰</span>Prihodi</button>
+  <button class="tab" onclick="showPage('rashodi')"><span class="tab-icon">💸</span>Rashodi</button>
+  <button class="tab" onclick="showPage('historija')"><span class="tab-icon">📋</span>Historija</button>
+  <button class="tab" onclick="showPage('analiza')"><span class="tab-icon">📈</span>Analiza</button>
+</div>
+
+<!-- ═══════════════════════ PREGLED ═══════════════════════ -->
+<div class="page active" id="page-pregled">
+  <div class="month-bar">
+    <button class="month-nav" onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="ml-pregled">—</span>
+    <button class="month-nav" onclick="changeMonth(1)">›</button>
+  </div>
+
+  <div class="ov-grid">
+    <div class="ov-card">
+      <div class="ov-label">Prihodi</div>
+      <div class="ov-amt income" id="ov-income">0 KM</div>
+      <div class="ov-sub" id="ov-income-sub">—</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-label">Rashodi</div>
+      <div class="ov-amt expense" id="ov-expense">0 KM</div>
+      <div class="ov-sub" id="ov-expense-sub">—</div>
+    </div>
+    <div class="ov-card full">
+      <div class="ov-label">Bilans (ostaje)</div>
+      <div class="ov-amt balance pos" id="ov-balance">0 KM</div>
+      <div class="ov-sub" id="ov-balance-sub">—</div>
+    </div>
+  </div>
+
+  <div class="savings-card">
+    <div class="sc-left">
+      <div class="sc-label">💚 Uštedina</div>
+      <div class="sc-amt" id="sc-amt">0 KM</div>
+      <div class="sc-sub" id="sc-sub">nema podataka</div>
+    </div>
+    <div class="sc-right">
+      <div class="sc-rate" id="sc-rate">—%</div>
+      <div class="sc-rate-label">od prihoda</div>
+    </div>
+  </div>
+
+  <div class="budget-bar-card">
+    <div class="bb-top">
+      <span class="bb-label">Potrošeno od prihoda</span>
+      <span class="bb-pct" id="bb-pct">0%</span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill safe" id="bb-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Kupovina source highlight -->
+  <div class="kupovina-source" id="kupovina-highlight" style="display:none">
+    <div class="ks-left">
+      <div class="ks-label">🛒 Iz Kupovina app</div>
+      <div class="ks-desc" id="kh-desc">Namirnice ovog mjeseca</div>
+      <div class="ks-sub" id="kh-sub">—</div>
+    </div>
+    <div class="ks-amt" id="kh-amt">0 KM</div>
+  </div>
+
+  <div class="cat-breakdown">
+    <div class="cb-title">Rashodi po kategoriji</div>
+    <div id="cat-breakdown-list"><div class="empty-state" style="padding:14px"><div class="icon">📂</div><p>Nema rashoda</p></div></div>
+  </div>
+
+  <div id="tips-section"></div>
+</div>
+
+<!-- ═══════════════════════ PRIHODI ═══════════════════════ -->
+<div class="page" id="page-prihodi">
+  <div class="month-bar">
+    <button class="month-nav" onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="ml-prihodi">—</span>
+    <button class="month-nav" onclick="changeMonth(1)">›</button>
+  </div>
+
+  <div class="form-section">
+    <div class="section-title"><span class="dot"></span>Dodaj prihod</div>
+    <div class="field">
+      <label>Opis</label>
+      <input type="text" id="inc-name" placeholder="npr. Plata april, Bonus..." autocomplete="off">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Iznos (KM)</label>
+        <input type="number" id="inc-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label>Datum</label>
+        <input type="date" id="inc-date">
+      </div>
+    </div>
+    <div class="field">
+      <label>Kategorija</label>
+      <select id="inc-cat">
+        <option value="plata">💼 Plata</option>
+        <option value="bonus">🎯 Bonus / Nagrada</option>
+        <option value="honorar">💻 Honorar</option>
+        <option value="ostalo">📦 Ostalo</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addIncome()">+ Dodaj prihod</button>
+  </div>
+
+  <div class="form-section">
+    <div class="section-title"><span class="dot"></span>Prihodi ovog mjeseca</div>
+    <div id="income-list"><div class="empty-state" style="padding:14px"><div class="icon">💰</div><p>Nema prihoda</p></div></div>
+    <div class="quick-total" id="income-total-row" style="display:none">
+      <span class="qt-label">Ukupno prihodi</span>
+      <span class="qt-amt" id="income-total-amt" style="color:var(--green)">0 KM</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ RASHODI ═══════════════════════ -->
+<div class="page" id="page-rashodi">
+  <div class="month-bar">
+    <button class="month-nav" onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="ml-rashodi">—</span>
+    <button class="month-nav" onclick="changeMonth(1)">›</button>
+  </div>
+
+  <!-- Kupovina rashodi -->
+  <div class="form-section">
+    <div class="section-title"><span class="dot blue"></span>Rashodi iz Kupovina 🛒</div>
+    <div class="kupovina-hint">Ovi rashodi dolaze automatski iz Kupovina aplikacije kada Nedim završi kupovinu. Ne mogu se brisati ovdje.</div>
+    <div id="kupovina-expense-list"><div class="empty-state" style="padding:14px"><div class="icon">🛒</div><p>Nema kupovina za ovaj mjesec</p></div></div>
+    <div class="quick-total" id="kupovina-total-row" style="display:none">
+      <span class="qt-label">Ukupno Kupovina</span>
+      <span class="qt-amt" id="kupovina-total-amt" style="color:var(--accent3)">0 KM</span>
+    </div>
+  </div>
+
+  <!-- Fixed expenses -->
+  <div class="form-section">
+    <div class="section-title"><span class="dot yellow"></span>Fiksni rashodi (rate & obaveze)</div>
+    <div class="fixed-hint">🔒 Unesite jednom — prikazuju se automatski svaki mjesec (kredit, vrtić, kirija...).</div>
+    <div class="row2">
+      <div class="field">
+        <label>Opis</label>
+        <input type="text" id="fix-name" placeholder="npr. Rata kredita" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Iznos (KM)</label>
+        <input type="number" id="fix-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      </div>
+    </div>
+    <div class="field">
+      <label>Kategorija</label>
+      <select id="fix-cat">
+        <option value="kredit">🏦 Rata kredita</option>
+        <option value="vrtić">🧒 Vrtić</option>
+        <option value="stan">🏠 Kirija / Stan</option>
+        <option value="komunalije">💡 Komunalije (struja, voda, gas)</option>
+        <option value="internet">📡 Internet / Telefon</option>
+        <option value="osiguranje">🛡️ Osiguranje</option>
+        <option value="pretplate">📱 Pretplate (Netflix, Spotify...)</option>
+        <option value="lijek">💊 Redovni lijekovi</option>
+        <option value="ostalo-fix">📦 Ostalo fiksno</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addFixed()">+ Dodaj fiksni rashod</button>
+    <div class="divider"></div>
+    <div id="fixed-list"><div class="empty-state" style="padding:14px"><div class="icon">🔒</div><p>Nema fiksnih rashoda</p></div></div>
+    <div class="quick-total" id="fixed-total-row" style="display:none">
+      <span class="qt-label">Ukupno fiksni</span>
+      <span class="qt-amt" id="fixed-total-amt" style="color:var(--yellow)">0 KM</span>
+    </div>
+  </div>
+
+  <!-- Variable expenses -->
+  <div class="form-section">
+    <div class="section-title"><span class="dot red"></span>Ostali varijabilni rashodi</div>
+    <div class="field">
+      <label>Opis</label>
+      <input type="text" id="exp-name" placeholder="npr. Gorivo, Restoran, Odjeća..." autocomplete="off">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Iznos (KM)</label>
+        <input type="number" id="exp-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label>Datum</label>
+        <input type="date" id="exp-date">
+      </div>
+    </div>
+    <div class="field">
+      <label>Kategorija</label>
+      <select id="exp-cat">
+        <option value="gorivo">⛽ Gorivo</option>
+        <option value="restoran">🍽️ Restoran / Kafić</option>
+        <option value="odjeća">👕 Odjeća & Obuća</option>
+        <option value="zdravlje">🏥 Zdravlje & Ljekarna</option>
+        <option value="djeca">👶 Djeca & Igračke</option>
+        <option value="sport">⚽ Sport & Rekreacija</option>
+        <option value="putovanje">✈️ Putovanje</option>
+        <option value="pokloni">🎁 Pokloni</option>
+        <option value="auto">🚗 Auto (servis, registracija)</option>
+        <option value="kućanstvo">🏠 Kućanstvo & Popravci</option>
+        <option value="štednja">💰 Štednja / Investicija</option>
+        <option value="ostalo-var">📦 Ostalo</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addExpense()">+ Dodaj rashod</button>
+    <div class="divider"></div>
+    <div id="expense-list"><div class="empty-state" style="padding:14px"><div class="icon">💸</div><p>Nema varijabilnih rashoda</p></div></div>
+    <div class="quick-total" id="expense-total-row" style="display:none">
+      <span class="qt-label">Ukupno varijabilni</span>
+      <span class="qt-amt" id="expense-total-amt" style="color:var(--red)">0 KM</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ HISTORIJA ═══════════════════════ -->
+<div class="page" id="page-historija">
+  <div id="history-content"><div class="empty-state"><div class="icon">📋</div><p>Nema historije</p></div></div>
+</div>
+
+<!-- ═══════════════════════ ANALIZA ═══════════════════════ -->
+<div class="page" id="page-analiza">
+  <div class="analytics-card">
+    <div class="analytics-title">📊 Prihodi vs. Rashodi (6 mj.)</div>
+    <div class="trend-chart" id="trend-chart"></div>
+    <div style="display:flex;gap:12px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--green);border-radius:2px;opacity:.7"></div><span style="font-size:.6rem;color:var(--muted)">Prihodi</span></div>
+      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--red);border-radius:2px;opacity:.7"></div><span style="font-size:.6rem;color:var(--muted)">Rashodi</span></div>
+    </div>
+  </div>
+  <div class="analytics-card">
+    <div class="analytics-title">📅 Prosjeci (zadnjih 6 mj.)</div>
+    <div id="averages-content"><div class="empty-state" style="padding:14px"><p>Nema dovoljno podataka</p></div></div>
+  </div>
+  <div class="analytics-card">
+    <div class="analytics-title">🎯 Savjeti za štednju</div>
+    <div id="recommendations"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  FIREBASE — BUDŽET (novi projekat)
+// ════════════════════════════════════════════════
+const BUDZET_CONFIG = {
+  apiKey:            "AIzaSyAuGptv4IhaUFTM1pWLyliM7C2_LDXDVbo",
+  authDomain:        "budzet-app-544ee.firebaseapp.com",
+  databaseURL:       "https://budzet-app-544ee-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "budzet-app-544ee",
+  storageBucket:     "budzet-app-544ee.firebasestorage.app",
+  messagingSenderId: "173846226186",
+  appId:             "1:173846226186:web:37753daa0858e7c4cb06f3"
+};
+
+// ════════════════════════════════════════════════
+//  FIREBASE — KUPOVINA (čitanje Nedimovih kupovina)
+// ════════════════════════════════════════════════
+const KUPOVINA_CONFIG = {
+  apiKey: "AIzaSyCZL2mXvMKZVlMlcdl2Quf-bw3nboGNolo",
+  authDomain: "kupovina-cehic.firebaseapp.com",
+  databaseURL: "https://kupovina-cehic-default-rtdb.firebaseio.com",
+  projectId: "kupovina-cehic",
+  storageBucket: "kupovina-cehic.firebasestorage.app",
+  messagingSenderId: "664140526247",
+  appId: "1:664140526247:web:0230a26c8222e3a56ba182"
+};
+
+const budzetApp    = firebase.initializeApp(BUDZET_CONFIG,   'budzet');
+const kupovinaApp  = firebase.initializeApp(KUPOVINA_CONFIG, 'kupovina');
+
+const dbBudzet    = budzetApp.database();
+const dbKupovina  = kupovinaApp.database();
+
+const ROOT_BUD = 'budzet_cehic';
+const ROOT_KUP = 'porodica_cehic';
+
+// ════════════════════════════════════════════════
+//  SYNC STATUS
+// ════════════════════════════════════════════════
+function setSyncStatus(status, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot ' + status;
+  lbl.textContent = label;
+}
+
+// ════════════════════════════════════════════════
+//  LOCAL STATE
+// ════════════════════════════════════════════════
+let localData = {
+  incomes: [],
+  expenses: [],
+  fixedExpenses: []
+};
+
+// Kupovina purchases fetched from Kupovina Firebase (read-only)
+let kupovinaExpenses = [];
+
+// ════════════════════════════════════════════════
+//  MONTH STATE
+// ════════════════════════════════════════════════
+const NOW = new Date();
+let curYear  = NOW.getFullYear();
+let curMonth = NOW.getMonth();
+
+const MONTHS = ['Januar','Februar','Mart','April','Maj','Juni',
+                'Juli','August','September','Oktober','November','Decembar'];
+
+function monthKey(y, m) { return `${y}-${String(m+1).padStart(2,'0')}`; }
+function curKey()       { return monthKey(curYear, curMonth); }
+
+function changeMonth(dir) {
+  curMonth += dir;
+  if(curMonth < 0)  { curMonth = 11; curYear--; }
+  if(curMonth > 11) { curMonth = 0;  curYear++; }
+  renderAll();
+}
+
+// ════════════════════════════════════════════════
+//  CATEGORY CONFIG
+// ════════════════════════════════════════════════
+const CAT_COLORS = {
+  kredit:'#a855f7', vrtić:'#fb923c', stan:'#60a5fa', komunalije:'#fbbf24',
+  internet:'#34d399', osiguranje:'#818cf8', pretplate:'#f472b6',
+  hrana:'#4ade80', gorivo:'#f87171', restoran:'#fb923c', odjeća:'#c084fc',
+  zdravlje:'#67e8f9', djeca:'#fde047', sport:'#86efac', putovanje:'#93c5fd',
+  pokloni:'#f9a8d4', auto:'#fca5a5', kućanstvo:'#a3e635', štednja:'#c8f535',
+  kupovina:'#35c8f5',
+  'ostalo-fix':'#9ca3af', 'ostalo-var':'#9ca3af', lijek:'#67e8f9'
+};
+
+const CAT_ICONS = {
+  kredit:'🏦', vrtić:'🧒', stan:'🏠', komunalije:'💡', internet:'📡',
+  osiguranje:'🛡️', pretplate:'📱', hrana:'🛒', gorivo:'⛽', restoran:'🍽️',
+  odjeća:'👕', zdravlje:'🏥', djeca:'👶', sport:'⚽', putovanje:'✈️',
+  pokloni:'🎁', auto:'🚗', kućanstvo:'🏠', štednja:'💰',
+  kupovina:'🛒', lijek:'💊',
+  'ostalo-fix':'📦', 'ostalo-var':'📦',
+  plata:'💼', bonus:'🎯', honorar:'💻', ostalo:'📦'
+};
+
+function catLabel(cat) {
+  const L = {
+    kredit:'Rata kredita', vrtić:'Vrtić', stan:'Kirija/Stan',
+    komunalije:'Komunalije', internet:'Internet/Tel', osiguranje:'Osiguranje',
+    pretplate:'Pretplate', hrana:'Hrana', gorivo:'Gorivo', restoran:'Restoran',
+    odjeća:'Odjeća', zdravlje:'Zdravlje', djeca:'Djeca', sport:'Sport',
+    putovanje:'Putovanje', pokloni:'Pokloni', auto:'Auto', kućanstvo:'Kućanstvo',
+    štednja:'Štednja', kupovina:'Kupovina', lijek:'Lijekovi',
+    'ostalo-fix':'Ostalo', 'ostalo-var':'Ostalo',
+    plata:'Plata', bonus:'Bonus', honorar:'Honorar', ostalo:'Ostalo'
+  };
+  return L[cat] || cat;
+}
+
+// ════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════
+function fmt(n) {
+  return (Math.round(n * 100) / 100)
+    .toLocaleString('bs-BA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' KM';
+}
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, dur = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ════════════════════════════════════════════════
+//  DATA HELPERS — totals per month
+// ════════════════════════════════════════════════
+function incomes(key)  { return (localData.incomes  || []).filter(i => i.date && i.date.startsWith(key)); }
+function varExp(key)   { return (localData.expenses || []).filter(e => e.date && e.date.startsWith(key)); }
+function fixedExp()    { return localData.fixedExpenses || []; }
+function kupExp(key)   { return kupovinaExpenses.filter(k => k.date && k.date.startsWith(key)); }
+
+function totalIncome(key)    { return incomes(key).reduce((s,i) => s + (i.amount||0), 0); }
+function totalFixed()        { return fixedExp().reduce((s,e) => s + (e.amount||0), 0); }
+function totalVar(key)       { return varExp(key).reduce((s,e) => s + (e.amount||0), 0); }
+function totalKupovina(key)  { return kupExp(key).reduce((s,k) => s + (k.amount||0), 0); }
+function totalExpenses(key)  { return totalFixed() + totalVar(key) + totalKupovina(key); }
+
+// ════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════
+const PAGES = ['pregled','prihodi','rashodi','historija','analiza'];
+function showPage(id) {
+  PAGES.forEach((p, i) => {
+    document.getElementById('page-' + p).classList.toggle('active', p === id);
+    document.querySelectorAll('.tab')[i].classList.toggle('active', p === id);
+  });
+  renderAll();
+}
+
+// ════════════════════════════════════════════════
+//  RENDER ALL
+// ════════════════════════════════════════════════
+function renderAll() {
+  renderMonthLabels();
+  renderOverview();
+  renderIncomeList();
+  renderKupovinaList();
+  renderFixedList();
+  renderExpenseList();
+  renderHistory();
+  renderAnalysis();
+}
+
+function renderMonthLabels() {
+  const lbl = `${MONTHS[curMonth]} ${curYear}`;
+  ['ml-pregled','ml-prihodi','ml-rashodi'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = lbl;
+  });
+}
+
+// ════════════════════════════════════════════════
+//  PREGLED
+// ════════════════════════════════════════════════
+function renderOverview() {
+  const key  = curKey();
+  const inc  = totalIncome(key);
+  const exp  = totalExpenses(key);
+  const kup  = totalKupovina(key);
+  const fix  = totalFixed();
+  const vari = totalVar(key);
+  const bal  = inc - exp;
+  const pct  = inc > 0 ? Math.min((exp / inc) * 100, 100) : 0;
+  const savR = inc > 0 ? Math.max(0, ((inc - exp) / inc) * 100) : 0;
+
+  document.getElementById('ov-income').textContent  = fmt(inc);
+  document.getElementById('ov-income-sub').textContent = `${incomes(key).length} stavki`;
+  document.getElementById('ov-expense').textContent = fmt(exp);
+  document.getElementById('ov-expense-sub').textContent =
+    `Fix: ${fmt(fix)} · Kup: ${fmt(kup)} · Var: ${fmt(vari)}`;
+
+  const balEl = document.getElementById('ov-balance');
+  balEl.textContent  = fmt(bal);
+  balEl.className    = 'ov-amt balance ' + (bal >= 0 ? 'pos' : 'neg');
+  document.getElementById('ov-balance-sub').textContent =
+    bal >= 0 ? '✅ U plusu!' : '⚠️ Rashodi veći od prihoda!';
+
+  // Savings card
+  document.getElementById('sc-amt').textContent  = fmt(Math.max(0, bal));
+  document.getElementById('sc-rate').textContent = savR.toFixed(0) + '%';
+  document.getElementById('sc-sub').textContent  =
+    inc === 0 ? 'Unesi prihode za ovaj mjesec' :
+    bal >= 0  ? `${savR.toFixed(1)}% prihoda ide na stranu` :
+                '⚠️ Overdraft ' + fmt(Math.abs(bal));
+
+  // Budget bar
+  const fill = document.getElementById('bb-fill');
+  fill.style.width = pct.toFixed(1) + '%';
+  fill.className   = 'bar-fill ' + (pct < 70 ? 'safe' : pct < 90 ? 'warn' : 'over');
+  document.getElementById('bb-pct').textContent = pct.toFixed(0) + '%';
+
+  // Kupovina source pill
+  const khCard = document.getElementById('kupovina-highlight');
+  if(kup > 0) {
+    khCard.style.display = 'flex';
+    document.getElementById('kh-desc').textContent = `${kupExp(key).length} kupovine`;
+    document.getElementById('kh-sub').textContent  = 'Auto-sync iz Kupovina app';
+    document.getElementById('kh-amt').textContent  = fmt(kup);
+  } else {
+    khCard.style.display = 'none';
+  }
+
+  renderCategoryBreakdown(key, exp);
+  renderTips(inc, exp, bal, savR, kup);
+}
+
+function renderCategoryBreakdown(key, totalExp) {
+  const container = document.getElementById('cat-breakdown-list');
+  if(totalExp === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:14px"><div class="icon">📂</div><p>Nema rashoda za ovaj mjesec</p></div>';
+    return;
+  }
+  const byCat = {};
+  fixedExp().forEach(e => { byCat[e.cat] = (byCat[e.cat]||0) + (e.amount||0); });
+  varExp(key).forEach(e  => { byCat[e.cat] = (byCat[e.cat]||0) + (e.amount||0); });
+  // Kupovina as single "kupovina" category
+  const kupTotal = totalKupovina(key);
+  if(kupTotal > 0) byCat['kupovina'] = (byCat['kupovina']||0) + kupTotal;
+
+  const sorted = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  const maxAmt = sorted[0]?.[1] || 1;
+
+  container.innerHTML = sorted.map(([cat, amt]) => {
+    const pct   = (amt / maxAmt) * 100;
+    const color = CAT_COLORS[cat] || '#9ca3af';
+    return `
+      <div class="cb-row">
+        <div class="cb-icon">${CAT_ICONS[cat]||'📦'}</div>
+        <div class="cb-info">
+          <div class="cb-name">${catLabel(cat)}</div>
+          <div class="cb-bar-track">
+            <div class="cb-bar-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+        </div>
+        <div class="cb-amt">${fmt(amt)}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderTips(inc, exp, bal, savR, kupTotal) {
+  const tips = [];
+  if(inc > 0 && savR < 10 && savR >= 0)
+    tips.push({icon:'💡', text:`Cilj je uštedjeti barem <strong>20% prihoda</strong>. Trenutno čuvaš ${savR.toFixed(0)}%.`});
+  if(bal < 0)
+    tips.push({icon:'⚠️', text:`<strong>Rashodi su veći od prihoda</strong> za ${fmt(Math.abs(bal))}. Pregledaj varijabilne troškove.`});
+  if(totalFixed() > inc * 0.5 && inc > 0)
+    tips.push({icon:'🏦', text:`Fiksni rashodi čine <strong>više od 50% prihoda</strong>. Razmotri refinansiranje kredita.`});
+  if(inc > 0 && savR > 20)
+    tips.push({icon:'🎉', text:`Odlično! Čuvaš ${savR.toFixed(0)}% prihoda. Razmotri <strong>štedni ili investicioni račun</strong>.`});
+
+  const section = document.getElementById('tips-section');
+  section.innerHTML = tips.map(t =>
+    `<div class="tip-card"><div class="tip-icon">${t.icon}</div><div class="tip-text">${t.text}</div></div>`
+  ).join('');
+}
+
+// ════════════════════════════════════════════════
+//  INCOME
+// ════════════════════════════════════════════════
+function addIncome() {
+  const name   = document.getElementById('inc-name').value.trim();
+  const amount = parseFloat(document.getElementById('inc-amount').value);
+  const date   = document.getElementById('inc-date').value;
+  const cat    = document.getElementById('inc-cat').value;
+
+  if(!name)         { toast('⚠️ Unesite opis prihoda'); return; }
+  if(!amount||amount<=0){ toast('⚠️ Unesite ispravan iznos'); return; }
+  if(!date)         { toast('⚠️ Odaberite datum'); return; }
+
+  const entry = { id: Date.now(), name, amount, date, cat };
+  localData.incomes.push(entry);
+  pushBudzet('incomes', entry);
+
+  document.getElementById('inc-name').value   = '';
+  document.getElementById('inc-amount').value = '';
+  document.getElementById('inc-date').value   = todayStr();
+  toast('✅ Prihod dodan!');
+  renderAll();
+}
+
+function deleteIncome(id) {
+  localData.incomes = localData.incomes.filter(i => i.id !== id);
+  deleteBudzet('incomes', id);
+  renderAll(); toast('🗑️ Prihod obrisan');
+}
+
+function renderIncomeList() {
+  const key   = curKey();
+  const list  = incomes(key);
+  const cont  = document.getElementById('income-list');
+  const totRow= document.getElementById('income-total-row');
+  const totAmt= document.getElementById('income-total-amt');
+  if(!cont) return;
+
+  if(!list.length) {
+    cont.innerHTML = '<div class="empty-state" style="padding:14px"><div class="icon">💰</div><p>Nema prihoda</p></div>';
+    if(totRow) totRow.style.display = 'none';
+    return;
+  }
+  cont.innerHTML = list.map(i => `
+    <div class="inc-card">
+      <div class="inc-icon">${CAT_ICONS[i.cat]||'💰'}</div>
+      <div class="inc-info">
+        <div class="inc-name">${esc(i.name)}</div>
+        <div class="inc-date">${catLabel(i.cat)} · ${i.date}</div>
+      </div>
+      <div class="inc-amt">${fmt(i.amount)}</div>
+      <button class="inc-del" onclick="deleteIncome(${i.id})">🗑</button>
+    </div>`).join('');
+
+  const total = list.reduce((s,i) => s + i.amount, 0);
+  if(totRow) { totRow.style.display = 'flex'; totAmt.textContent = fmt(total); }
+}
+
+// ════════════════════════════════════════════════
+//  KUPOVINA LIST (read-only, from Kupovina Firebase)
+// ════════════════════════════════════════════════
+function renderKupovinaList() {
+  const key  = curKey();
+  const list = kupExp(key).sort((a,b) => b.date.localeCompare(a.date));
+  const cont = document.getElementById('kupovina-expense-list');
+  const totR = document.getElementById('kupovina-total-row');
+  const totA = document.getElementById('kupovina-total-amt');
+  if(!cont) return;
+
+  if(!list.length) {
+    cont.innerHTML = '<div class="empty-state" style="padding:14px"><div class="icon">🛒</div><p>Nema kupovina za ovaj mjesec</p></div>';
+    if(totR) totR.style.display = 'none';
+    return;
+  }
+  cont.innerHTML = list.map(k => `
+    <div class="item-card">
+      <div class="ic-icon">🛒</div>
+      <div class="ic-info">
+        <div class="ic-name">${esc(k.title)} <span class="ic-badge badge-kup">KUPOVINA</span></div>
+        <div class="ic-sub">${esc(k.store||'')}${k.store?' · ':''}${k.date.slice(0,10)} · ${k.itemCount||'?'} stavki</div>
+      </div>
+      <div class="ic-right">
+        <div class="ic-amt" style="color:var(--accent3)">${fmt(k.amount)}</div>
+      </div>
+    </div>`).join('');
+
+  const total = list.reduce((s,k) => s + k.amount, 0);
+  if(totR) { totR.style.display = 'flex'; totA.textContent = fmt(total); }
+}
+
+// ════════════════════════════════════════════════
+//  FIXED EXPENSES
+// ════════════════════════════════════════════════
+function addFixed() {
+  const name   = document.getElementById('fix-name').value.trim();
+  const amount = parseFloat(document.getElementById('fix-amount').value);
+  const cat    = document.getElementById('fix-cat').value;
+
+  if(!name)          { toast('⚠️ Unesite naziv'); return; }
+  if(!amount||amount<=0){ toast('⚠️ Unesite ispravan iznos'); return; }
+
+  const entry = { id: Date.now(), name, amount, cat };
+  localData.fixedExpenses.push(entry);
+  pushBudzet('fixedExpenses', entry);
+
+  document.getElementById('fix-name').value   = '';
+  document.getElementById('fix-amount').value = '';
+  toast('🔒 Fiksni rashod dodan!');
+  renderAll();
+}
+
+function deleteFixed(id) {
+  localData.fixedExpenses = localData.fixedExpenses.filter(e => e.id !== id);
+  deleteBudzet('fixedExpenses', id);
+  renderAll(); toast('🗑️ Fiksni rashod obrisan');
+}
+
+function renderFixedList() {
+  const list = fixedExp();
+  const cont = document.getElementById('fixed-list');
+  const totR = document.getElementById('fixed-total-row');
+  const totA = document.getElementById('fixed-total-amt');
+  if(!cont) return;
+
+  if(!list.length) {
+    cont.innerHTML = '<div class="empty-state" style="padding:14px"><div class="icon">🔒</div><p>Nema fiksnih rashoda</p></div>';
+    if(totR) totR.style.display = 'none';
+    return;
+  }
+  cont.innerHTML = list.map(e => `
+    <div class="item-card">
+      <div class="ic-icon">${CAT_ICONS[e.cat]||'📦'}</div>
+      <div class="ic-info">
+        <div class="ic-name">${esc(e.name)} <span class="ic-badge badge-fixed">FIKSNO</span></div>
+        <div class="ic-sub">${catLabel(e.cat)} · svaki mjesec</div>
+      </div>
+      <div class="ic-right">
+        <div class="ic-amt">${fmt(e.amount)}</div>
+        <button class="ic-del" onclick="deleteFixed(${e.id})">🗑</button>
+      </div>
+    </div>`).join('');
+
+  const total = totalFixed();
+  if(totR) { totR.style.display = 'flex'; totA.textContent = fmt(total); }
+}
+
+// ════════════════════════════════════════════════
+//  VARIABLE EXPENSES
+// ════════════════════════════════════════════════
+function addExpense() {
+  const name   = document.getElementById('exp-name').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  const date   = document.getElementById('exp-date').value;
+  const cat    = document.getElementById('exp-cat').value;
+
+  if(!name)          { toast('⚠️ Unesite opis'); return; }
+  if(!amount||amount<=0){ toast('⚠️ Unesite ispravan iznos'); return; }
+  if(!date)          { toast('⚠️ Odaberite datum'); return; }
+
+  const entry = { id: Date.now(), name, amount, date, cat };
+  localData.expenses.push(entry);
+  pushBudzet('expenses', entry);
+
+  document.getElementById('exp-name').value   = '';
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-date').value   = todayStr();
+  toast('✅ Rashod dodan!');
+  renderAll();
+}
+
+function deleteExpense(id) {
+  localData.expenses = localData.expenses.filter(e => e.id !== id);
+  deleteBudzet('expenses', id);
+  renderAll(); toast('🗑️ Rashod obrisan');
+}
+
+function renderExpenseList() {
+  const key  = curKey();
+  const list = varExp(key).sort((a,b) => b.date.localeCompare(a.date));
+  const cont = document.getElementById('expense-list');
+  const totR = document.getElementById('expense-total-row');
+  const totA = document.getElementById('expense-total-amt');
+  if(!cont) return;
+
+  if(!list.length) {
+    cont.innerHTML = '<div class="empty-state" style="padding:14px"><div class="icon">💸</div><p>Nema varijabilnih rashoda</p></div>';
+    if(totR) totR.style.display = 'none';
+    return;
+  }
+  cont.innerHTML = list.map(e => `
+    <div class="item-card">
+      <div class="ic-icon">${CAT_ICONS[e.cat]||'📦'}</div>
+      <div class="ic-info">
+        <div class="ic-name">${esc(e.name)} <span class="ic-badge badge-var">VAR</span></div>
+        <div class="ic-sub">${catLabel(e.cat)} · ${e.date}</div>
+      </div>
+      <div class="ic-right">
+        <div class="ic-amt">${fmt(e.amount)}</div>
+        <button class="ic-del" onclick="deleteExpense(${e.id})">🗑</button>
+      </div>
+    </div>`).join('');
+
+  const total = list.reduce((s,e) => s + e.amount, 0);
+  if(totR) { totR.style.display = 'flex'; totA.textContent = fmt(total); }
+}
+
+// ════════════════════════════════════════════════
+//  HISTORY (6 months)
+// ════════════════════════════════════════════════
+function renderHistory() {
+  const cont = document.getElementById('history-content');
+  if(!cont) return;
+  let html = '';
+
+  for(let i = 0; i < 6; i++) {
+    let m = curMonth - i, y = curYear;
+    while(m < 0) { m += 12; y--; }
+    const key = monthKey(y, m);
+    const inc = totalIncome(key);
+    const exp = totalExpenses(key);
+    const bal = inc - exp;
+    const iList = incomes(key);
+    const vList = varExp(key);
+    const kList = kupExp(key);
+    if(!iList.length && !vList.length && !kList.length && !fixedExp().length) continue;
+
+    html += `
+      <div class="hist-month">
+        <div class="hist-month-hdr">
+          ${MONTHS[m]} ${y}
+          <span class="hist-month-result ${bal>=0?'pos':'neg'}">${bal>=0?'+':''}${fmt(bal)}</span>
+        </div>`;
+
+    iList.forEach(it => {
+      html += `<div class="hist-row">
+        <div class="hist-type i">PRIHOD</div>
+        <div class="hist-desc">${CAT_ICONS[it.cat]||''} ${esc(it.name)}</div>
+        <div class="hist-amt i">+${fmt(it.amount)}</div>
+      </div>`;
+    });
+
+    kList.forEach(k => {
+      html += `<div class="hist-row">
+        <div class="hist-type k">KUPOVINA</div>
+        <div class="hist-desc">🛒 ${esc(k.title)}${k.store?' · '+esc(k.store):''}</div>
+        <div class="hist-amt k">-${fmt(k.amount)}</div>
+      </div>`;
+    });
+
+    fixedExp().forEach(e => {
+      html += `<div class="hist-row">
+        <div class="hist-type e">FIKSNO</div>
+        <div class="hist-desc">${CAT_ICONS[e.cat]||''} ${esc(e.name)}</div>
+        <div class="hist-amt e">-${fmt(e.amount)}</div>
+      </div>`;
+    });
+
+    vList.forEach(e => {
+      html += `<div class="hist-row">
+        <div class="hist-type e">RASHOD</div>
+        <div class="hist-desc">${CAT_ICONS[e.cat]||''} ${esc(e.name)}</div>
+        <div class="hist-amt e">-${fmt(e.amount)}</div>
+      </div>`;
+    });
+
+    html += '</div>';
+  }
+
+  cont.innerHTML = html || '<div class="empty-state"><div class="icon">📋</div><p>Nema historije</p></div>';
+}
+
+// ════════════════════════════════════════════════
+//  ANALYSIS
+// ════════════════════════════════════════════════
+function renderAnalysis() {
+  const months = [];
+  for(let i = 5; i >= 0; i--) {
+    let m = curMonth - i, y = curYear;
+    while(m < 0) { m += 12; y--; }
+    const key = monthKey(y, m);
+    months.push({ label: MONTHS[m].slice(0,3), inc: totalIncome(key), exp: totalExpenses(key) });
+  }
+
+  // Trend chart
+  const chartEl = document.getElementById('trend-chart');
+  if(chartEl) {
+    const maxVal = Math.max(...months.map(m => Math.max(m.inc, m.exp)), 1);
+    chartEl.innerHTML = months.map(m => {
+      const iH = Math.max((m.inc / maxVal) * 70, m.inc > 0 ? 4 : 0);
+      const eH = Math.max((m.exp / maxVal) * 70, m.exp > 0 ? 4 : 0);
+      return `
+        <div class="trend-bar-wrap">
+          <div style="display:flex;align-items:flex-end;gap:2px;height:70px;justify-content:center">
+            <div class="trend-bar income-bar" style="height:${iH}px;width:45%"></div>
+            <div class="trend-bar expense-bar" style="height:${eH}px;width:45%"></div>
+          </div>
+          <div class="trend-label">${m.label}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // Averages
+  const avgEl = document.getElementById('averages-content');
+  if(avgEl) {
+    const withData = months.filter(m => m.inc > 0 || m.exp > 0);
+    if(!withData.length) {
+      avgEl.innerHTML = '<div class="empty-state" style="padding:14px"><p>Nema dovoljno podataka</p></div>';
+    } else {
+      const aI = withData.reduce((s,m)=>s+m.inc,0)/withData.length;
+      const aE = withData.reduce((s,m)=>s+m.exp,0)/withData.length;
+      const aB = aI - aE;
+      avgEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+          <div>
+            <div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Avg prihodi</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--green);font-size:.9rem">${fmt(aI)}</div>
+          </div>
+          <div>
+            <div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Avg rashodi</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--red);font-size:.9rem">${fmt(aE)}</div>
+          </div>
+          <div>
+            <div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Avg bilans</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;color:${aB>=0?'var(--accent)':'var(--red)'};font-size:.9rem">${fmt(aB)}</div>
+          </div>
+        </div>`;
+    }
+  }
+
+  // Recommendations
+  const recEl = document.getElementById('recommendations');
+  if(recEl) {
+    recEl.innerHTML = [
+      {icon:'🎯', text:'<strong>50/30/20 pravilo:</strong> 50% na potrebe, 30% na želje, 20% štednja.'},
+      {icon:'🏦', text:'<strong>Hitni fond:</strong> Cilj 3–6 plata na štednom računu za neočekivane troškove.'},
+      {icon:'📊', text:'<strong>Refinansiraj kredit</strong> jednom godišnje — možda postoji bolja kamata.'},
+      {icon:'💡', text:'<strong>Automatizuj štednju:</strong> Trajni nalog prvog dana po isplati plate.'},
+    ].map(r => `<div class="tip-card"><div class="tip-icon">${r.icon}</div><div class="tip-text">${r.text}</div></div>`).join('');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  FIREBASE BUDŽET — Read/Write
+// ════════════════════════════════════════════════
+function pushBudzet(collection, entry) {
+  setSyncStatus('syncing', 'Snima...');
+  dbBudzet.ref(`${ROOT_BUD}/${collection}/${entry.id}`).set(entry)
+    .then(() => setSyncStatus('connected', 'Synced'))
+    .catch(err => { console.error(err); setSyncStatus('error', 'Greška'); });
+}
+
+function deleteBudzet(collection, id) {
+  dbBudzet.ref(`${ROOT_BUD}/${collection}/${id}`).remove()
+    .catch(err => console.error('Delete error:', err));
+}
+
+function loadBudzet() {
+  setSyncStatus('syncing', 'Učitava...');
+  dbBudzet.ref(ROOT_BUD).on('value', snap => {
+    if(snap.exists()) {
+      const d = snap.val();
+      localData.incomes       = d.incomes       ? Object.values(d.incomes)       : [];
+      localData.expenses      = d.expenses      ? Object.values(d.expenses)      : [];
+      localData.fixedExpenses = d.fixedExpenses ? Object.values(d.fixedExpenses) : [];
+    }
+    setSyncStatus('connected', 'Synced');
+    renderAll();
+  }, err => {
+    console.error('Budžet load error:', err);
+    setSyncStatus('error', 'Greška sync');
+  });
+}
+
+// ════════════════════════════════════════════════
+//  FIREBASE KUPOVINA — Read Nedim's purchases
+// ════════════════════════════════════════════════
+function loadKupovinaExpenses() {
+  // Listen to Kupovina history (finished shopping sessions by Nedim)
+  dbKupovina.ref(`${ROOT_KUP}/history`).on('value', snap => {
+    const kupList = [];
+    if(snap.exists()) {
+      snap.forEach(child => {
+        const h = child.val();
+        // Only include Nedim's shopping sessions
+        if(h.buyer === 'Nedim' && h.total > 0) {
+          const dateStr = h.date ? h.date.slice(0,10) : '';
+          kupList.push({
+            id:        h.id || child.key,
+            date:      dateStr,
+            title:     `Kupovina (${h.itemCount||'?'} stavki)`,
+            amount:    Math.round((h.total||0) * 100) / 100,
+            store:     h.store || '',
+            itemCount: h.itemCount || 0,
+            source:    'history'
+          });
+        }
+      });
+    }
+    kupovinaExpenses = kupList;
+    renderAll();
+  }, err => {
+    console.warn('Kupovina history read error:', err);
+  });
+
+  // Also listen to manual receipts saved by Nedim in Kupovina app
+  dbKupovina.ref(`${ROOT_KUP}/receipts`).on('value', snap => {
+    // Remove old receipt entries first
+    kupovinaExpenses = kupovinaExpenses.filter(k => k.source !== 'receipt');
+    if(snap.exists()) {
+      snap.forEach(child => {
+        const r = child.val();
+        if(r.buyer === 'Nedim' && r.amount > 0) {
+          const dateStr = r.date ? r.date.slice(0,10) : '';
+          kupovinaExpenses.push({
+            id:        r.id || child.key,
+            date:      dateStr,
+            title:     r.title || 'Račun',
+            amount:    Math.round((r.amount||0) * 100) / 100,
+            store:     r.store || '',
+            itemCount: 0,
+            source:    'receipt'
+          });
+        }
+      });
+    }
+    renderAll();
+  }, err => {
+    console.warn('Kupovina receipts read error:', err);
+  });
+}
+
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
+document.getElementById('inc-date').value = todayStr();
+document.getElementById('exp-date').value = todayStr();
+setSyncStatus('syncing', 'Spajam...');
+
+loadBudzet();
+loadKupovinaExpenses();
+</script>
+</body>
+</html>
